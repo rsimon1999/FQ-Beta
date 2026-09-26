@@ -1,25 +1,25 @@
-"""Main CustomTkinter window application supporting Tabview controls."""
+"""Main CustomTkinter window application supporting Easy Mode and Advanced DSP Studio tabs."""
 import os
 import customtkinter as ctk
 from tkinter import messagebox
 
 from src.audio.engine import SoundscapeEngine
-from src.ui.frames import ControlFrame
+from src.ui.frames import EasyControlFrame, AdvancedControlFrame
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
+
 
 class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("NeuroAcoustic Sound Studio")
-        self.geometry("560x680")
+        self.geometry("580x690")
         self.resizable(False, False)
         self.engine = SoundscapeEngine()
         self._setup_ui()
 
     def _setup_ui(self):
-        # Header Title
         title_lbl = ctk.CTkLabel(
             self,
             text="NeuroAcoustic Studio",
@@ -34,30 +34,24 @@ class MainApp(ctk.CTk):
         )
         subtitle_lbl.pack(anchor="w", padx=20, pady=(0, 10))
 
-        # Main Tabview Interface
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(fill="both", expand=True, padx=15, pady=(0, 10))
 
         self.tab_easy = self.tabview.add("Easy Mode")
         self.tab_advanced = self.tabview.add("Advanced DSP Studio")
 
-        # Easy Mode Controls
-        self.control_frame = ControlFrame(
+        self.easy_frame = EasyControlFrame(
             self.tab_easy, generate_callback=self.run_generation
         )
-        self.control_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self.easy_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Advanced DSP Studio Placeholder Label
-        dsp_label = ctk.CTkLabel(
-            self.tab_advanced,
-            text="Advanced DSP Controls & Multi-Phase Routing",
-            text_color="gray",
+        self.advanced_frame = AdvancedControlFrame(
+            self.tab_advanced, generate_callback=self.run_generation
         )
-        dsp_label.pack(expand=True)
+        self.advanced_frame.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Status Bar
         self.status_var = ctk.StringVar(
-            value="Ready. Select a goal or adjust sliders."
+            value="Ready. Select a preset or customize DSP controls."
         )
         self.status_bar = ctk.CTkLabel(
             self,
@@ -91,5 +85,5 @@ class MainApp(ctk.CTk):
             self.status_var.set(" Error generating audio.")
             messagebox.showerror("Error", str(e))
 
-# Backward compatibility alias
+
 MainApplication = MainApp
