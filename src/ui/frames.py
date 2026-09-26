@@ -1,6 +1,7 @@
 """UI Frames for Easy Mode and Advanced DSP Studio controls."""
 
 import customtkinter as ctk
+from src.ui.constants import ATMOSPHERE_CHOICES, ATMOSPHERE_MAP
 
 
 class EasyControlFrame(ctk.CTkFrame):
@@ -30,8 +31,8 @@ class EasyControlFrame(ctk.CTkFrame):
 
         # Background Atmosphere selector
         ctk.CTkLabel(self, text="Atmosphere / Noise:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=15, pady=(5, 2))
-        self.noise_option = ctk.CTkOptionMenu(self, values=["Brown Noise (Ocean Waves)", "Pink Noise (Rain)", "White Noise", "None"])
-        self.noise_option.set("Brown Noise (Ocean Waves)")
+        self.noise_option = ctk.CTkOptionMenu(self, values=ATMOSPHERE_CHOICES)
+        self.noise_option.set("Ocean Waves")
         self.noise_option.pack(fill="x", padx=15, pady=(0, 15))
 
         # Tone Volume Slider
@@ -66,12 +67,14 @@ class EasyControlFrame(ctk.CTkFrame):
 
     def _on_generate(self):
         preset_data = self.PRESETS[self.preset_option.get()]
+        selected_atmosphere = self.noise_option.get()
+        noise_key = ATMOSPHERE_MAP.get(selected_atmosphere, selected_atmosphere.lower())
         params = {
             "start_beat": preset_data["start_beat"],
             "target_beat": preset_data["target_beat"],
             "carrier_freq": preset_data["carrier_freq"],
             "duration_sec": float(self.duration_option.get()) * 60,
-            "noise_type": self.noise_option.get(),
+            "noise_type": noise_key,
             "tone_volume": self.tone_slider.get() / 100.0,
             "noise_level": self.noise_slider.get() / 100.0,
             "isochronic_mode": False,
@@ -114,8 +117,8 @@ class AdvancedControlFrame(ctk.CTkFrame):
 
         # Atmosphere
         ctk.CTkLabel(self, text="Atmosphere / Noise:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=15, pady=(10, 2))
-        self.noise_option = ctk.CTkOptionMenu(self, values=["Brown Noise (Ocean Waves)", "Pink Noise (Rain)", "White Noise", "None"])
-        self.noise_option.set("Brown Noise (Ocean Waves)")
+        self.noise_option = ctk.CTkOptionMenu(self, values=ATMOSPHERE_CHOICES)
+        self.noise_option.set("Ocean Waves")
         self.noise_option.pack(fill="x", padx=15, pady=(0, 10))
 
         # Tone Volume Slider
@@ -162,15 +165,18 @@ class AdvancedControlFrame(ctk.CTkFrame):
         self.harmonic_lbl.configure(text=f"Harmonic Richness: {val:.2f}")
 
     def _on_generate(self):
+        selected_atmosphere = self.noise_option.get()
+        noise_key = ATMOSPHERE_MAP.get(selected_atmosphere, selected_atmosphere.lower())
         params = {
             "start_beat": float(self.start_beat_entry.get()),
             "target_beat": float(self.target_beat_entry.get()),
             "carrier_freq": float(self.carrier_entry.get()),
             "duration_sec": float(self.duration_entry.get()) * 60,
-            "noise_type": self.noise_option.get(),
+            "noise_type": noise_key,
             "tone_volume": self.tone_slider.get() / 100.0,
             "noise_level": self.noise_slider.get() / 100.0,
             "isochronic_mode": bool(self.isochronic_switch.get()),
             "harmonic_richness": float(self.harmonic_slider.get()),
         }
         self.generate_callback(params)
+
