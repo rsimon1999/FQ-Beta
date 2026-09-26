@@ -1,4 +1,4 @@
-"""Core Soundscape Engine handling DSP synthesis for binaural beats, sample-based ambient assets, dynamic ocean swells, and multi-stage sequencing."""
+"""Core Soundscape Engine handling DSP synthesis, dynamic asset management, per-track volume trimming, and multi-stage session rendering."""
 
 import os
 import numpy as np
@@ -8,12 +8,32 @@ import soundfile as sf
 
 class SoundscapeEngine:
 
+    # Registry mapping query keys -> (filename, default_gain_trim)
+    ASSET_REGISTRY = {
+        "rain": ("rain.mp3", 1.0),
+        "pink": ("rain.mp3", 1.0),
+        "wave": ("ocean.mp3", 1.0),
+        "ocean": ("ocean.mp3", 1.0),
+        "brown": ("ocean.mp3", 1.0),
+        "white": ("white.mp3", 0.75),
+        "wind": ("wind.mp3", 0.90),
+        "forest": ("forest.mp3", 1.0),
+        "forrest": ("forest.mp3", 1.0),
+        "pond": ("pond.mp3", 1.0),
+        "river": ("river.mp3", 0.45),  # Attenuated to fix loud mix balance
+        "camping": ("camping.mp3", 0.90),
+        "thunder": ("thunder.mp3", 1.0),
+        "storm": ("thunder.mp3", 1.0),
+        "wildlife": ("wildlife.mp3", 0.85),
+        "urban": ("urban.mp3", 0.80),
+    }
+
     def __init__(self, sample_rate=44100, assets_dir="assets"):
         self.sample_rate = sample_rate
         self.assets_dir = assets_dir
 
-    def _load_and_loop_asset(self, filename, duration_samples, level=0.65):
-        """Loads an audio file asset, resamples if needed, and loops seamlessly with equal-power crossfading."""
+    def _load_and_loop_asset(self, filename, duration_samples, level=0.65, trim=1.0):
+        """Loads an audio asset, resamples to engine sample rate, applies gain trim, and loops seamlessly with crossfades."""
         filepath = os.path.join(self.assets_dir, filename)
         if not os.path.exists(filepath):
             return None
@@ -24,23 +44,23 @@ class SoundscapeEngine:
             print(f"Warning: Could not read asset file {filepath}: {e}")
             return None
 
-        # Resample if audio sample rate differs from engine sample rate
+        # Resample if asset sample rate differs
         if sr != self.sample_rate:
             num_target_samples = int(len(data) * (self.sample_rate / float(sr)))
             data = signal.resample(data, num_target_samples, axis=0)
 
-        # Force 2-channel stereo format
+        # Force 2-channel stereo
         if data.ndim == 1:
             data = np.column_stack((data, data))
         elif data.shape[1] == 1:
             data = np.repeat(data, 2, axis=1)
 
-        # Seamless looping with equal-power crossfading across boundary overlaps
+        # Equal-power crossfade looping across boundaries
         asset_len = len(data)
         if asset_len >= duration_samples:
             looped_audio = data[:duration_samples]
         else:
-            fade_samples = min(int(0.3 * self.sample_rate), asset_len // 4)
+            fade_samples = min(int(0.35 * self.sample_rate), asset_len // 4)
             if fade_samples > 0:
                 fade_out = np.linspace(1.0, 0.0, fade_samples)[:, np.newaxis]
                 fade_in = np.linspace(0.0, 1.0, fade_samples)[:, np.newaxis]
@@ -58,15 +78,15 @@ class SoundscapeEngine:
             full_stream = np.tile(loop_unit, (repeats, 1))
             looped_audio = full_stream[:duration_samples]
 
-        # Peak normalization and volume scaling
+        # Peak normalization and apply master level + trim
         max_val = np.max(np.abs(looped_audio))
         if max_val > 0:
-            looped_audio = (looped_audio / max_val) * level
+            looped_audio = (looped_audio / max_val) * (level * trim)
 
         return looped_audio.astype(np.float32)
 
     def generate_noise(self, noise_type, duration_samples, level=0.65):
-        """Generates stereo soundscapes (Recorded Assets, Ocean Waves, DSP Rain, Soft White)."""
+        """Generates stereo soundscapes using registered sample assets with DSP mathematical fallbacks."""
         noise_str = str(noise_type).lower().strip()
 
         if "none" in noise_str or not noise_str:
@@ -75,12 +95,14 @@ class SoundscapeEngine:
         nyquist = self.sample_rate / 2.0
         white = np.random.uniform(-1.0, 1.0, (duration_samples, 2)).astype(np.float32)
 
-        # Check for recorded rain asset first if rain/pink noise requested
-        if "pink" in noise_str or "rain" in noise_str:
-            asset_audio = self._load_and_loop_asset("rain.mp3", duration_samples, level=level)
-            if asset_audio is not None:
-                return asset_audio
+        # 1. Check registry for matching audio file asset
+        for key, (filename, trim) in self.ASSET_REGISTRY.items():
+            if key in noise_str:
+                asset_audio = self._load_and_loop_asset(filename, duration_samples, level=level, trim=trim)
+                if asset_audio is not None:
+                    return asset_audio
 
+        # 2. DSP Fallbacks if assets are missing
         if "white" in noise_str:
             b, a = signal.butter(2, 8000.0 / nyquist, btype='low')
             soft_white = signal.lfilter(b, a, white, axis=0)
@@ -90,9 +112,7 @@ class SoundscapeEngine:
             return soft_white.astype(np.float32)
 
         if "pink" in noise_str or "rain" in noise_str:
-            # --- DSP FALLBACK RAIN ENGINE ---
             t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
-
             b_pink = [0.049922035, -0.095993537, 0.050612699, -0.004408786]
             a_pink = [1.0, -2.494956002, 2.017265875, -0.522189400]
             pink_base = signal.lfilter(b_pink, a_pink, white, axis=0)
@@ -100,87 +120,22 @@ class SoundscapeEngine:
             b_lp, a_lp = signal.butter(2, 1800.0 / nyquist, btype='low')
             rain_bed = signal.lfilter(b_lp, a_lp, pink_base, axis=0)
 
-            wind_lfo = 0.70 + 0.30 * (
-                0.5 * np.sin(2 * np.pi * 0.04 * t) +
-                0.3 * np.sin(2 * np.pi * 0.09 * t + 1.1) +
-                0.2 * np.sin(2 * np.pi * 0.015 * t + 2.5)
-            )
-            rain_bed[:, 0] *= wind_lfo
-            rain_bed[:, 1] *= wind_lfo
-
-            impulse_threshold = 0.9995
-            impulses_l = (np.random.uniform(0, 1, duration_samples) > impulse_threshold).astype(np.float32)
-            impulses_r = (np.random.uniform(0, 1, duration_samples) > impulse_threshold).astype(np.float32)
-
-            impulses_l *= np.random.uniform(0.3, 1.0, duration_samples)
-            impulses_r *= np.random.uniform(0.3, 1.0, duration_samples)
-
-            b_pop1, a_pop1 = signal.iirpeak(420.0 / nyquist, Q=5.0)
-            pops_low_l = signal.lfilter(b_pop1, a_pop1, impulses_l)
-            pops_low_r = signal.lfilter(b_pop1, a_pop1, impulses_r)
-
-            b_pop2, a_pop2 = signal.iirpeak(780.0 / nyquist, Q=7.0)
-            pops_mid_l = signal.lfilter(b_pop2, a_pop2, impulses_l)
-            pops_mid_r = signal.lfilter(b_pop2, a_pop2, impulses_r)
-
-            b_pop3, a_pop3 = signal.iirpeak(1250.0 / nyquist, Q=9.0)
-            pops_high_l = signal.lfilter(b_pop3, a_pop3, impulses_l)
-            pops_high_r = signal.lfilter(b_pop3, a_pop3, impulses_r)
-
-            droplets_l = (1.2 * pops_low_l) + pops_mid_l + (0.7 * pops_high_l)
-            droplets_r = (1.2 * pops_low_r) + pops_mid_r + (0.7 * pops_high_r)
+            wind_lfo = 0.70 + 0.30 * np.sin(2 * np.pi * 0.04 * t)
+            rain_bed *= wind_lfo[:, np.newaxis]
 
             max_bed = np.max(np.abs(rain_bed))
             if max_bed > 0:
-                rain_bed /= max_bed
-            
-            droplet_stereo = np.column_stack((droplets_l, droplets_r))
-            max_drop = np.max(np.abs(droplet_stereo))
-            if max_drop > 0:
-                droplet_stereo /= max_drop
+                rain_bed = (rain_bed / max_bed) * level
+            return rain_bed.astype(np.float32)
 
-            rain_mix = (0.45 * rain_bed) + (0.55 * droplet_stereo)
-            rain_mix *= level
-            return rain_mix.astype(np.float32)
-
-        if "brown" in noise_str:
-            # Check for recorded ocean asset first, fallback to synthesized surf
-            asset_audio = self._load_and_loop_asset("ocean.mp3", duration_samples, level=level)
-            if asset_audio is not None:
-                return asset_audio
-
+        if "brown" in noise_str or "wave" in noise_str or "ocean" in noise_str:
             b_br = [0.10]
             a_br = [1.0, -0.985]
             brown_base = signal.lfilter(b_br, a_br, white, axis=0)
-
-            b_deep, a_deep = signal.butter(2, 220.0 / nyquist, btype='low')
-            b_surf, a_surf = signal.butter(2, 1400.0 / nyquist, btype='low')
-            
-            deep_layer = signal.lfilter(b_deep, a_deep, brown_base, axis=0)
-            surf_layer = signal.lfilter(b_surf, a_surf, brown_base, axis=0)
-
-            max_d = np.max(np.abs(deep_layer))
-            if max_d > 0: deep_layer /= max_d
-            max_s = np.max(np.abs(surf_layer))
-            if max_s > 0: surf_layer /= max_s
-
-            t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
-            
-            lfo_l = 0.5 * (1.0 + np.sin(2 * np.pi * 0.08 * t))
-            lfo_r = 0.5 * (1.0 + np.sin(2 * np.pi * 0.065 * t + 1.2))
-            
-            swell_l = 0.15 + 0.85 * lfo_l
-            swell_r = 0.15 + 0.85 * lfo_r
-
-            left_wave = (deep_layer[:, 0] * (0.8 - 0.4 * swell_l)) + (surf_layer[:, 0] * (swell_l ** 1.6))
-            right_wave = (deep_layer[:, 1] * (0.8 - 0.4 * swell_r)) + (surf_layer[:, 1] * (swell_r ** 1.6))
-
-            ocean_stereo = np.column_stack((left_wave * swell_l, right_wave * swell_r))
-            max_ocean = np.max(np.abs(ocean_stereo))
-            if max_ocean > 0:
-                ocean_stereo = (ocean_stereo / max_ocean) * level
-
-            return ocean_stereo.astype(np.float32)
+            max_b = np.max(np.abs(brown_base))
+            if max_b > 0:
+                brown_base = (brown_base / max_b) * level
+            return brown_base.astype(np.float32)
 
         return np.zeros((duration_samples, 2), dtype=np.float32)
 
