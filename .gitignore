@@ -1,0 +1,21 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Audio outputs & exports
+output/*.wav
+!output/.gitkeep
+
+# Environment & IDE
+.venv/
+venv/
+ENV/
+.idea/
+.vscode/
+.DS_Store
+
+# Backups & Archives
+*.tar.gz
+*.zip
