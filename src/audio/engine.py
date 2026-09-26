@@ -1,4 +1,4 @@
-"""Core Soundscape Engine handling DSP synthesis for binaural beats, dynamic ocean swells, organic rain patter, and multi-stage sequencing."""
+"""Core Soundscape Engine handling DSP synthesis for binaural beats, dynamic ocean swells, acoustic rain patter, and multi-stage sequencing."""
 
 import numpy as np
 import scipy.signal as signal
@@ -11,18 +11,16 @@ class SoundscapeEngine:
         self.sample_rate = sample_rate
 
     def generate_noise(self, noise_type, duration_samples, level=0.65):
-        """Generates realistic 2-channel (stereo) soundscapes (Ocean Waves, Rain Patter, Soft White)."""
+        """Generates realistic 2-channel soundscapes (Ocean Waves, Heavy Rain Drops, Soft White)."""
         noise_str = str(noise_type).lower().strip()
 
         if "none" in noise_str or not noise_str:
             return np.zeros((duration_samples, 2), dtype=np.float32)
 
-        # Independent stereo white noise streams
-        white = np.random.uniform(-1.0, 1.0, (duration_samples, 2)).astype(np.float32)
         nyquist = self.sample_rate / 2.0
+        white = np.random.uniform(-1.0, 1.0, (duration_samples, 2)).astype(np.float32)
 
         if "white" in noise_str:
-            # Softened white noise (gentle roll-off above 8kHz to remove ear fatigue)
             b, a = signal.butter(2, 8000.0 / nyquist, btype='low')
             soft_white = signal.lfilter(b, a, white, axis=0)
             max_v = np.max(np.abs(soft_white))
@@ -31,51 +29,75 @@ class SoundscapeEngine:
             return soft_white.astype(np.float32)
 
         if "pink" in noise_str:
-            # --- ORGANIC RAIN ENGINE ---
-            # 1. Base Pink Noise generation (Voss-McCartney filter)
+            # --- HEAVY DROPLET & SOFT AMBIENT RAIN ENGINE ---
+            t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
+
+            # 1. Base Pink Bed (Voss-McCartney filter)
             b_pink = [0.049922035, -0.095993537, 0.050612699, -0.004408786]
             a_pink = [1.0, -2.494956002, 2.017265875, -0.522189400]
             pink_base = signal.lfilter(b_pink, a_pink, white, axis=0)
 
-            # Dampen static hiss with a 5kHz low-pass filter
-            b_lp, a_lp = signal.butter(2, 5000.0 / nyquist, btype='low')
+            # Soften static bed with a warm 1.8kHz low-pass roll-off
+            b_lp, a_lp = signal.butter(2, 1800.0 / nyquist, btype='low')
             rain_bed = signal.lfilter(b_lp, a_lp, pink_base, axis=0)
 
-            # 2. Wind/Gust Modulation (slow LFOs for shifting rain intensity)
-            t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
-            wind_lfo_l = 0.75 + 0.25 * np.sin(2 * np.pi * 0.12 * t)
-            wind_lfo_r = 0.75 + 0.25 * np.sin(2 * np.pi * 0.09 * t + 0.8)
-            rain_bed[:, 0] *= wind_lfo_l
-            rain_bed[:, 1] *= wind_lfo_r
+            # 2. Wind Gust Modulation (Gentle intensity waves)
+            wind_lfo = 0.70 + 0.30 * (
+                0.5 * np.sin(2 * np.pi * 0.04 * t) +
+                0.3 * np.sin(2 * np.pi * 0.09 * t + 1.1) +
+                0.2 * np.sin(2 * np.pi * 0.015 * t + 2.5)
+            )
+            rain_bed[:, 0] *= wind_lfo
+            rain_bed[:, 1] *= wind_lfo
 
-            # 3. Raindrop Impact Layer (Granular splatter patter)
-            drop_impulses = (np.random.uniform(0, 1, (duration_samples, 2)) > 0.9975).astype(np.float32)
-            drop_impulses *= np.random.uniform(0.2, 1.0, (duration_samples, 2))
-            
-            # Bandpass filter drop impacts (1.2kHz - 4.5kHz) for natural droplet acoustics
-            b_bp, a_bp = signal.butter(2, [1200.0 / nyquist, 4500.0 / nyquist], btype='bandpass')
-            droplets = signal.lfilter(b_bp, a_bp, drop_impulses, axis=0)
+            # 3. Heavy Droplet Impact Layer (Low frequency, spaced further apart)
+            impulse_threshold = 0.9995  # Sparse threshold for well-separated drops
+            impulses_l = (np.random.uniform(0, 1, duration_samples) > impulse_threshold).astype(np.float32)
+            impulses_r = (np.random.uniform(0, 1, duration_samples) > impulse_threshold).astype(np.float32)
 
-            # Balance bed (80%) + droplet patter (20%)
+            impulses_l *= np.random.uniform(0.3, 1.0, duration_samples)
+            impulses_r *= np.random.uniform(0.3, 1.0, duration_samples)
+
+            # Low-frequency peak filters for heavy drop body and puddle impact
+            # Deep puddle plop (420 Hz)
+            b_pop1, a_pop1 = signal.iirpeak(420.0 / nyquist, Q=5.0)
+            pops_low_l = signal.lfilter(b_pop1, a_pop1, impulses_l)
+            pops_low_r = signal.lfilter(b_pop1, a_pop1, impulses_r)
+
+            # Mid drop body (780 Hz)
+            b_pop2, a_pop2 = signal.iirpeak(780.0 / nyquist, Q=7.0)
+            pops_mid_l = signal.lfilter(b_pop2, a_pop2, impulses_l)
+            pops_mid_r = signal.lfilter(b_pop2, a_pop2, impulses_r)
+
+            # Upper drop tone (1250 Hz)
+            b_pop3, a_pop3 = signal.iirpeak(1250.0 / nyquist, Q=9.0)
+            pops_high_l = signal.lfilter(b_pop3, a_pop3, impulses_l)
+            pops_high_r = signal.lfilter(b_pop3, a_pop3, impulses_r)
+
+            droplets_l = (1.2 * pops_low_l) + pops_mid_l + (0.7 * pops_high_l)
+            droplets_r = (1.2 * pops_low_r) + pops_mid_r + (0.7 * pops_high_r)
+
+            # Normalize layers
             max_bed = np.max(np.abs(rain_bed))
             if max_bed > 0:
                 rain_bed /= max_bed
-            max_drop = np.max(np.abs(droplets))
+            
+            droplet_stereo = np.column_stack((droplets_l, droplets_r))
+            max_drop = np.max(np.abs(droplet_stereo))
             if max_drop > 0:
-                droplets /= max_drop
+                droplet_stereo /= max_drop
 
-            rain_mix = (0.80 * rain_bed) + (0.20 * droplets)
+            # Mix: 45% warm background bed + 55% heavy resonant drop impacts
+            rain_mix = (0.45 * rain_bed) + (0.55 * droplet_stereo)
             rain_mix *= level
             return rain_mix.astype(np.float32)
 
         if "brown" in noise_str:
             # --- DYNAMIC OCEAN WAVE SURF ENGINE ---
-            # 1. Brownian noise base
             b_br = [0.10]
             a_br = [1.0, -0.985]
             brown_base = signal.lfilter(b_br, a_br, white, axis=0)
 
-            # 2. Dual-band spectrums (Deep Rumble vs. Foam/Surf Crash)
             b_deep, a_deep = signal.butter(2, 220.0 / nyquist, btype='low')
             b_surf, a_surf = signal.butter(2, 1400.0 / nyquist, btype='low')
             
@@ -87,7 +109,6 @@ class SoundscapeEngine:
             max_s = np.max(np.abs(surf_layer))
             if max_s > 0: surf_layer /= max_s
 
-            # 3. Time-varying Stereo Wave Swell LFOs
             t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
             
             lfo_l = 0.5 * (1.0 + np.sin(2 * np.pi * 0.08 * t))
@@ -96,9 +117,6 @@ class SoundscapeEngine:
             swell_l = 0.15 + 0.85 * lfo_l
             swell_r = 0.15 + 0.85 * lfo_r
 
-            # Dynamic Spectral Crossfade:
-            # Trough -> Deep underwater rumble dominates
-            # Crest -> Bright crashing surf washes in
             left_wave = (deep_layer[:, 0] * (0.8 - 0.4 * swell_l)) + (surf_layer[:, 0] * (swell_l ** 1.6))
             right_wave = (deep_layer[:, 1] * (0.8 - 0.4 * swell_r)) + (surf_layer[:, 1] * (swell_r ** 1.6))
 
@@ -146,7 +164,6 @@ class SoundscapeEngine:
             left_channel *= envelope
             right_channel *= envelope
 
-        # Add 2-channel stereo noise layer
         stereo_noise = self.generate_noise(noise_type, num_samples, level=noise_level)
         left_channel += stereo_noise[:, 0]
         right_channel += stereo_noise[:, 1]
