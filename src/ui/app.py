@@ -14,7 +14,7 @@ class MainApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("NeuroAcoustic Sound Studio")
-        self.geometry("580x690")
+        self.geometry("580x740")
         self.resizable(False, False)
         self.engine = SoundscapeEngine()
         self._setup_ui()
@@ -75,6 +75,10 @@ class MainApp(ctk.CTk):
                 carrier_freq=params["carrier_freq"],
                 duration_sec=params["duration_sec"],
                 noise_type=params["noise_type"],
+                isochronic_mode=params.get("isochronic_mode", False),
+                harmonic_richness=params.get("harmonic_richness", 0.0),
+                tone_volume=params.get("tone_volume", 0.10),
+                noise_level=params.get("noise_level", 0.65),
                 output_filepath=filename,
             )
             self.status_var.set(f" Saved: {output_path}")

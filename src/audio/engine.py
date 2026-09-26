@@ -10,21 +10,20 @@ class SoundscapeEngine:
     def __init__(self, sample_rate=44100):
         self.sample_rate = sample_rate
 
-    def generate_noise(self, noise_type, duration_samples, level=0.25):
-        """Generates normalized noise scaled to a specific peak level relative to 1.0 sine carrier."""
+    def generate_noise(self, noise_type, duration_samples, level=0.65):
+        """Generates normalized noise scaled to a specific peak level relative to sine carrier."""
         noise_str = str(noise_type).lower().strip()
 
         if "none" in noise_str or not noise_str:
             return np.zeros(duration_samples, dtype=np.float32)
 
-        # Base white noise uniform distribution [-1, 1]
         white = np.random.uniform(-1.0, 1.0, duration_samples)
 
         if "white" in noise_str:
             return (white * level).astype(np.float32)
 
         if "pink" in noise_str:
-            # Voss-McCartney / Paul Kellet pinking filter
+            # Steady rain effect - Voss-McCartney filter
             b = [0.049922035, -0.095993537, 0.050612699, -0.004408786]
             a = [1.0, -2.494956002, 2.017265875, -0.522189400]
             pink = signal.lfilter(b, a, white)
@@ -34,13 +33,25 @@ class SoundscapeEngine:
             return pink.astype(np.float32)
 
         if "brown" in noise_str:
-            # Leaky Integrator filter for Brownian noise (prevents long-term DC drift)
+            # Leaky Integrator for Brownian noise
             b = [0.10]
             a = [1.0, -0.985]
             brown = signal.lfilter(b, a, white)
             max_b = np.max(np.abs(brown))
             if max_b > 0:
-                brown = (brown / max_b) * level
+                brown = brown / max_b
+
+            # Dynamic ocean wave swell engine
+            t = np.linspace(0, duration_samples / self.sample_rate, duration_samples, endpoint=False)
+            
+            # Dual non-harmonic LFOs (12.5s and 18.8s periods)
+            lfo_primary = 0.5 * (1.0 + np.sin(2 * np.pi * 0.08 * t))      
+            lfo_secondary = 0.5 * (1.0 + np.sin(2 * np.pi * 0.053 * t + 1.5))
+            
+            # Combine swells: floor at 20% intensity, peaking at full level
+            swell_envelope = 0.20 + 0.80 * (0.65 * lfo_primary + 0.35 * lfo_secondary)
+
+            brown = brown * swell_envelope * level
             return brown.astype(np.float32)
 
         return np.zeros(duration_samples, dtype=np.float32)
@@ -54,6 +65,8 @@ class SoundscapeEngine:
         noise_type="none",
         isochronic_mode=False,
         harmonic_richness=0.0,
+        tone_volume=0.10,   # Default background tone (10% volume)
+        noise_level=0.65,   # Default dominant wave ambient (65% volume)
     ):
         """Generates a raw 2-channel numpy array for a single entrainment stage."""
         num_samples = int(self.sample_rate * duration_sec)
@@ -63,12 +76,14 @@ class SoundscapeEngine:
         phase_diff = 2 * np.pi * np.cumsum(beat_freqs) / self.sample_rate
 
         carrier_phase = 2 * np.pi * carrier_freq * t
-        left_channel = np.sin(carrier_phase)
-        right_channel = np.sin(carrier_phase + phase_diff)
+        
+        # Tone output scaled down to soft background level
+        left_channel = tone_volume * np.sin(carrier_phase)
+        right_channel = tone_volume * np.sin(carrier_phase + phase_diff)
 
         if harmonic_richness > 0:
-            left_channel += harmonic_richness * 0.5 * np.sin(2 * carrier_phase)
-            right_channel += harmonic_richness * 0.5 * np.sin(2 * (carrier_phase + phase_diff))
+            left_channel += tone_volume * harmonic_richness * 0.5 * np.sin(2 * carrier_phase)
+            right_channel += tone_volume * harmonic_richness * 0.5 * np.sin(2 * (carrier_phase + phase_diff))
 
         if isochronic_mode:
             pulse_hz = beat_freqs
@@ -77,12 +92,12 @@ class SoundscapeEngine:
             left_channel *= envelope
             right_channel *= envelope
 
-        # Generate noise (scaled to 25% of sine amplitude)
-        noise = self.generate_noise(noise_type, num_samples, level=0.25)
+        # Add background noise layer
+        noise = self.generate_noise(noise_type, num_samples, level=noise_level)
         left_channel += noise
         right_channel += noise
 
-        # Peak normalization across both channels
+        # Peak normalization
         max_val = max(np.max(np.abs(left_channel)), np.max(np.abs(right_channel)))
         if max_val > 1.0:
             left_channel /= max_val
@@ -99,6 +114,8 @@ class SoundscapeEngine:
         noise_type="none",
         isochronic_mode=False,
         harmonic_richness=0.0,
+        tone_volume=0.10,
+        noise_level=0.65,
         output_filepath="output/session.wav",
     ):
         """Single-stage render wrapper."""
@@ -110,15 +127,14 @@ class SoundscapeEngine:
             noise_type=noise_type,
             isochronic_mode=isochronic_mode,
             harmonic_richness=harmonic_richness,
+            tone_volume=tone_volume,
+            noise_level=noise_level,
         )
         sf.write(output_filepath, audio_data, self.sample_rate)
         return output_filepath
 
     def render_sequence_session(self, stages, output_filepath="output/sequence_session.wav", crossfade_sec=0.5):
-        """
-        Renders a multi-stage sequence into a single continuous WAV file.
-        `stages` is a list of stage dictionaries.
-        """
+        """Renders a multi-stage sequence into a single continuous WAV file."""
         if not stages:
             raise ValueError("No stages provided for sequence generation.")
 
@@ -133,6 +149,8 @@ class SoundscapeEngine:
                 noise_type=stage.get("noise_type", "none"),
                 isochronic_mode=stage.get("isochronic_mode", False),
                 harmonic_richness=stage.get("harmonic_richness", 0.0),
+                tone_volume=stage.get("tone_volume", 0.10),
+                noise_level=stage.get("noise_level", 0.65),
             )
             rendered_blocks.append(block)
 
