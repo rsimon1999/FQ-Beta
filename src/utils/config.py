@@ -1,13 +1,26 @@
 """Application configuration, default paths, and user preference persistence."""
 
 import os
+import sys
 import json
 from typing import Dict, Any
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-DEFAULT_ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
-DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+# Determine root and resource directories based on frozen status (PyInstaller)
+if getattr(sys, 'frozen', False):
+    BUNDLE_ROOT = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    PROJECT_ROOT = BUNDLE_ROOT
+    DEFAULT_ASSETS_DIR = os.path.join(BUNDLE_ROOT, "assets")
+
+    # User writeable directory for exports and settings (in user's Documents)
+    USER_APP_DIR = os.path.expanduser("~/Documents/NeuroAcousticStudio")
+    DEFAULT_OUTPUT_DIR = os.path.join(USER_APP_DIR, "output")
+    DEFAULT_DATA_DIR = os.path.join(USER_APP_DIR, "data")
+else:
+    PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    DEFAULT_ASSETS_DIR = os.path.join(PROJECT_ROOT, "assets")
+    DEFAULT_OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+    DEFAULT_DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+
 DEFAULT_SAMPLE_RATE = 44100
 SETTINGS_FILE = os.path.join(DEFAULT_DATA_DIR, "user_settings.json")
 

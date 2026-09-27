@@ -6,6 +6,9 @@ import scipy.signal as signal
 import soundfile as sf
 
 
+from src.utils.config import DEFAULT_ASSETS_DIR
+
+
 class SoundscapeEngine:
 
     # Registry mapping query keys -> (filename, default_gain_trim)
@@ -28,9 +31,9 @@ class SoundscapeEngine:
         "urban": ("urban.mp3", 0.80),
     }
 
-    def __init__(self, sample_rate=44100, assets_dir="assets"):
+    def __init__(self, sample_rate=44100, assets_dir=None):
         self.sample_rate = sample_rate
-        self.assets_dir = assets_dir
+        self.assets_dir = assets_dir or DEFAULT_ASSETS_DIR
 
     def _load_and_loop_asset(self, filename, duration_samples, level=0.65, trim=1.0):
         """Loads an audio asset, resamples to engine sample rate, applies gain trim, and loops seamlessly with crossfades."""

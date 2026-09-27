@@ -1,37 +1,57 @@
-Markdown
 # NeuroAcoustic Sound Studio
 
-A modular Python-based binaural beat and acoustic soundscape generator engineered for brainwave entrainment, focus, deep sleep, and state shifting.
+A modular Python-based binaural beat and acoustic soundscape workstation engineered for brainwave entrainment, focus, deep sleep, meditation, and cognitive state shifting.
+
+---
 
 ## Features
-* **Dynamic Entrainment Ramps:** Smoothly transition brainwave states from baseline to target Hz over customizable durations.
-* **Brainwave Presets:** Built-in targets for Delta, Theta, Alpha, Beta, Gamma, and Schumann Resonance.
-* **Stereo Binaural Generation:** High-precision carrier tone generation built with NumPy and SciPy.
-* **Modular DSP Architecture:** Easily extensible for custom waveforms, pink/brown noise filters, and multi-channel audio tracks.
+
+* **Segmented Category Pill Selector:** Quick-access pills for **Focus**, **Sleep**, **Calm**, **Flow**, **Mindful**, **Energy**, and **Peak** mental states with 27 scientifically mapped protocols.
+* **Real-Time Live Preview:** Audition your binaural tone and atmosphere balance instantly (8s in-memory stream) before rendering long files to disk.
+* **In-App Audio Player:** Listen to generated session files immediately inside the application.
+* **High-Fidelity Ambient Soundscapes:** 11 real-world audio atmospheres (Ocean Waves, Rain, River, Forest, Wind, Thunderstorm, Pond, Camping, Wildlife, Urban, White Noise) with seamless equal-power crossfade looping and per-track gain trimming.
+* **Advanced DSP Studio:** Fine-grained carrier frequency control, start/target Hz frequency sweeps, 2nd/3rd/5th harmonic overtone enrichment, and speaker-friendly isochronic pulse modulation.
+* **Preference Persistence:** Save your preferred startup volume levels (default: 80% atmosphere / 10% tone) and default atmosphere with one click.
+* **Resilient Architecture:** Automatic fallback to algorithmic mathematical noise filters (Butterworth low-pass swept pink/brown/white noise) and native macOS `afplay` playback fallback.
+
+---
 
 ## Directory Structure
-├── data/              # Preset configurations and dynamic profiles
-├── output/            # Generated audio files (.wav)
-├── src/
-│   ├── audio/         # Signal processing, generators, and engine logic
-│   ├── ui/            # GUI components and interface layouts
-│   └── utils/         # File exports, configuration management
-├── tests/             # PyTest test suite
-├── main.py            # Primary application launcher
-├── requirements.txt   # Dependencies (numpy, scipy)
-└── PROJECT_PLAN.md    # Development roadmap
 
+```
+├── assets/                    # MP3 ambient soundscape field recording loops
+├── data/                      # Preset schemas and persisted user_settings.json
+├── output/                    # Generated session audio files (.wav)
+├── presets/                   # Comprehensive 27-preset catalog (easy_mode.py)
+├── scripts/                   # System health audit, cleanup, and maintenance tool
+├── src/
+│   ├── audio/                 # DSP engine, real-time player, and signal generators
+│   ├── config/                # Preset templates and scenario configurations
+│   ├── ui/                    # CustomTkinter modern dark-mode interface and frames
+│   └── utils/                 # Path helpers, configuration persistence, and exporters
+├── tests/                     # Unit test suite for DSP engine and preset sanity checks
+├── main.py                    # Root application entry point
+├── requirements.txt           # Python package dependencies
+├── PROJECT_PLAN.md            # Development roadmap and phase tracking
+├── AGENTS.md                  # Quick pointer to master AI documentation
+└── NEUROACOUSTIC_STUDIO.md    # Master architectural specification
+```
+
+---
 
 ## Quick Start
 
-1. **Activate Virtual Environment:**
+1. **Install Dependencies:**
    ```bash
-   source .venv/bin/activate
-Install Dependencies:
+   pip install -r requirements.txt
+   ```
 
-Bash
-pip install -r requirements.txt
-Launch Application:
+2. **Launch Application:**
+   ```bash
+   python3 main.py
+   ```
 
-Bash
-python main.py
+3. **Run System Health Audit & Tests:**
+   ```bash
+   python3 scripts/maintenance.py --audit
+   ```

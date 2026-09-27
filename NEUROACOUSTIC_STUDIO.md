@@ -1,7 +1,7 @@
 # NeuroAcoustic Sound Studio — AI Agent Reference & Architectural Specification
 
 > **Target Audience:** AI Coding Agents, Pair Programmers, and Core Developers.  
-> **Purpose:** Single source of truth documenting application architecture, DSP mathematics, codebase structure, audio playback & preview engine, data models, execution pipelines, and engineering best practices.
+> **Purpose:** Single source of truth documenting application architecture, DSP mathematics, codebase structure, audio playback & preview engine, preset catalog, execution pipelines, and engineering best practices.
 
 ---
 
@@ -24,7 +24,7 @@
 * **Harmonic Overtones:** Incorporates weighted upper harmonics (2nd, 3rd, 5th harmonics) atop the base carrier to enrich acoustic warmth and prevent auditory fatigue.
 * **Isochronic Pulses:** Amplitude modulation envelopes applied evenly to both stereo channels for rhythmic brain entrainment audible through standard loudspeakers without headphones.
 * **Acoustic Atmosphere & Dynamic Soundscapes:** Real-world field recordings (ocean, rain, river, forest, etc.) with equal-power crossfade seamless looping, per-asset gain balancing, and algorithmic fallback DSP noise filters (Butterworth low-pass swept pink/brown/white noise).
-* **Default Acoustic Balance:** Default soundscape balance is configured at **80% Atmosphere Volume** and **10% Binaural Tone Volume** for optimal psychoacoustic immersion.
+* **Calibrated Default Mix:** Default soundscape balance is configured at **80% Atmosphere Volume** and **10% Binaural Tone Volume** for optimal psychoacoustic immersion.
 
 ---
 
@@ -38,22 +38,25 @@ graph TD
         MainApp --> EasyTab[EasyControlFrame (src/ui/frames.py)]
         MainApp --> AdvTab[AdvancedControlFrame (src/ui/frames.py)]
         MainApp --> PlaybackBar[In-App Playback Toolbar]
+        
+        EasyTab --> CategoryPills[Category Pill Bar (Focus, Sleep, Calm, Flow, Mindful, Energy, Peak)]
+        EasyTab --> PresetDropdown[Preset Protocol Dropdown (presets.easy_mode)]
         EasyTab --> UIConst[src.ui.constants (ATMOSPHERE_CHOICES, ATMOSPHERE_MAP)]
         AdvTab --> UIConst
     end
 
-    subgraph Config_Layer ["Configuration & Defaults (src/utils/ & src/config/)"]
+    subgraph Config_Layer ["Configuration & Defaults (src/utils/ & presets/)"]
         ConfigUtil[src.utils.config (load_user_settings, save_user_settings)]
+        Catalog_Presets[presets.easy_mode (EASY_MODE_PRESETS: 27 Protocols)]
         UI_Presets[src.config.presets (PRESETS, SCENARIOS, SEQUENCE_TEMPLATES)]
-        Catalog_Presets[presets.easy_mode (EASY_MODE_PRESETS)]
     end
 
     subgraph Engine_Layer ["DSP & Soundscape Engine (src/audio/)"]
         MainApp --> Engine[SoundscapeEngine (src/audio/engine.py)]
         MainApp --> Player[AudioPlayer (src/audio/player.py)]
         
-        Player -->|Async Stream / Preview| SysAudio[sounddevice (Speaker Output)]
-        Player -->|File Playback| SoundFile[soundfile (.wav)]
+        Player -->|Async Stream / Live Preview| SysAudio[sounddevice (Speaker Output)]
+        Player -->|File Playback / Native Fallback| SoundFile[soundfile / afplay (.wav)]
         
         Engine --> AssetLoader[Asset Loader & Crossfader (_load_and_loop_asset)]
         Engine --> NoiseGen[Noise Generator & Fallback Filters (generate_noise)]
@@ -100,9 +103,9 @@ graph TD
 │   ├── batch_panel.py         # Multi-preset queue selector and batch export UI
 │   └── easy_panel.py          # Categorized treeview preset explorer with stage table
 ├── output/                    # Destination directory for generated .wav files
-├── presets/                   # Standalone preset catalogs
+├── presets/                   # Primary categorized preset catalog
 │   ├── __init__.py
-│   └── easy_mode.py           # Deep catalog of multi-stage categorized presets
+│   └── easy_mode.py           # 27 multi-stage presets mapped across 7 functional categories
 ├── scripts/                   # System automation & maintenance
 │   └── maintenance.py         # Health audit, roadmap tracker, and cleanup tool
 ├── src/                       # Primary modular application package
@@ -121,7 +124,7 @@ graph TD
 │   │   ├── __init__.py
 │   │   ├── app.py             # MainApp window, layout, and playback orchestration
 │   │   ├── constants.py       # Atmosphere dropdown labels and key mappings
-│   │   └── frames.py          # EasyControlFrame and AdvancedControlFrame
+│   │   └── frames.py          # EasyControlFrame (Pill Selector) and AdvancedControlFrame
 │   └── utils/                 # Utility helpers
 │       ├── __init__.py
 │       ├── config.py          # Path constants & user settings persistence (load/save)
@@ -131,62 +134,55 @@ graph TD
 │   ├── test_audio.py          # Audio engine, player, & settings unit tests
 │   └── test_presets.py        # Validation sanity checks for preset catalogs
 ├── main.py                    # Root application entry point
-├── requirements.txt           # Python package dependencies (numpy, scipy, soundfile, sounddevice, customtkinter)
+├── requirements.txt           # Python package dependencies (customtkinter, numpy, scipy, soundfile, sounddevice)
 ├── PROJECT_PLAN.md            # Roadmap, phase progress, and planned features
-├── AGENTS.md                  # Quick pointer to master documentation
+├── AGENTS.md                  # Quick pointer to master AI documentation
 └── NEUROACOUSTIC_STUDIO.md    # This master reference document
 ```
 
 ---
 
-## 4. Audio Playback & Live Preview Engine (`src/audio/player.py`)
+## 4. UI Layer & Category Pill Selector (`src/ui/frames.py`)
 
-### 4.1 Real-Time In-Memory Preview (`play_preview`)
-* Allows instant auditioning of the tone/atmosphere balance without writing large audio files to disk.
+### 4.1 Category Pill Navigation (`EasyControlFrame`)
+* **Widget:** `ctk.CTkSegmentedButton` with 7 target state pills:
+  * `[ Focus ]` -> *Focus & Attention (6 presets)*
+  * `[ Sleep ]` -> *Sleep & Recovery (5 presets)*
+  * `[ Calm ]` -> *Calm & Relaxation (4 presets)*
+  * `[ Flow ]` -> *Creativity & Flow (5 presets)*
+  * `[ Mindful ]` -> *Meditation & Mindfulness (2 presets)*
+  * `[ Energy ]` -> *Energy & Arousal (3 presets)*
+  * `[ Peak ]` -> *Peak Cognition (2 presets)*
+* **Cascade Behavior:** Clicking any pill instantly filters the `Preset Protocol` dropdown to the clean, alphabetically sorted protocols for that specific goal.
+* **Live Insight Display:** Displays the category name, full descriptive summary, and sequential stage transition route (`Stages (N): Stage 1 ➔ Stage 2 ➔ Stage 3`).
+* **Duration Auto-Sync:** Automatically defaults the session duration selector to the sum of the preset's stage minutes.
+
+---
+
+## 5. Audio Playback & Live Preview Engine (`src/audio/player.py`)
+
+### 5.1 Real-Time In-Memory Preview (`play_preview`)
 * Synthesizes an $8\text{-second}$ stereo buffer using `SoundscapeEngine.generate_binaural_stage(...)`.
-* Streams non-blocking audio directly to the system default audio device via `sounddevice.play(array, 44100)`.
+* Streams non-blocking audio directly to the default audio device via `sounddevice.play(array, 44100)` without creating disk files.
 
-### 4.2 In-App File Playback (`play_file`)
+### 5.2 In-App File Playback (`play_file`)
 * Reads rendered `.wav` files via `soundfile.read(...)` and streams asynchronously in a background monitor thread.
-* Supports instantaneous cancellation / stopping via `stop()` / `sounddevice.stop()`.
-* Dispatches safe completion callbacks back to the Tkinter UI event loop.
+* Features native macOS `afplay` fallback if `sounddevice` encounters system backend issues.
+* Clean window closing protocol ensuring audio stops on application exit.
 
 ---
 
-## 5. User Settings & Preference Persistence (`src/utils/config.py`)
-
-* **Default Preferences:**
-  * Binaural Tone Volume: **10%** (`0.10`)
-  * Atmosphere Volume: **80%** (`0.80`)
-  * Default Atmosphere: `"Ocean Waves"`
-  * Default Duration: `10` minutes
-* **Functions:**
-  * `load_user_settings()`: Reads from `data/user_settings.json`, merging with standard defaults.
-  * `save_user_settings(dict)`: Persists user-selected sliders, dropdowns, and frequencies across sessions.
-  * Invoked by clicking **"💾 Save Current Settings as Default"** in either UI tab.
-
----
-
-## 6. Detailed Component Specifications
-
-### 6.1 `src/ui/app.py` (`MainApp`)
-* **Window Size:** $580 \times 790\,\text{px}$.
-* **Playback Toolbar:** Contains `"▶ Play Generated File"` button with live status label (`"No audio file loaded"`, `"Streaming live preview..."`, `"Playing: Session_10Hz_10min.wav"`).
-* **Handlers:**
-  * `run_preview(params)`: Triggers real-time $8\text{s}$ live preview.
-  * `stop_audio()`: Stops any active preview or file playback.
-  * `toggle_play_last_file()`: Starts/stops playback of the most recently rendered session.
-  * `save_defaults(params)`: Saves current frame values to `data/user_settings.json`.
-
----
-
-## 7. Verification & Health Audit
+## 6. Verification & Health Audit
 
 Run the system health audit at any time:
 ```bash
-python scripts/maintenance.py --audit
+python3 scripts/maintenance.py --audit
 ```
-Run the automated unit test suite:
+Run automated unit tests:
 ```bash
-python -m unittest discover tests
+python3 -m unittest discover tests
+```
+Run preset catalog verification:
+```bash
+python3 tests/test_presets.py
 ```
