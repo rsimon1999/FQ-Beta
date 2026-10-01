@@ -5,7 +5,6 @@ import numpy as np
 import scipy.signal as signal
 import soundfile as sf
 
-
 from src.utils.config import DEFAULT_ASSETS_DIR
 
 
@@ -187,6 +186,36 @@ class SoundscapeEngine:
 
         return np.column_stack((left_channel, right_channel)).astype(np.float32)
 
+    def _save_audio_file(self, output_filepath, audio_data):
+        """Saves rendered audio array to WAV, FLAC, OGG, or MP3 based on extension."""
+        ext = os.path.splitext(output_filepath)[1].lower()
+        os.makedirs(os.path.dirname(os.path.abspath(output_filepath)), exist_ok=True)
+
+        if ext in [".wav", ".flac", ".ogg"]:
+            sf.write(output_filepath, audio_data, self.sample_rate)
+            return output_filepath
+        elif ext == ".mp3":
+            temp_wav = output_filepath + ".tmp.wav"
+            sf.write(temp_wav, audio_data, self.sample_rate)
+            try:
+                from pydub import AudioSegment
+                sound = AudioSegment.from_wav(temp_wav)
+                sound.export(output_filepath, format="mp3", bitrate="192k")
+            except Exception as e:
+                # Fallback to WAV if MP3 conversion fails
+                fallback_wav = os.path.splitext(output_filepath)[0] + ".wav"
+                sf.write(fallback_wav, audio_data, self.sample_rate)
+                raise RuntimeError(
+                    f"MP3 export failed ({e}). Saved as WAV instead: {fallback_wav}"
+                )
+            finally:
+                if os.path.exists(temp_wav):
+                    os.remove(temp_wav)
+            return output_filepath
+        else:
+            sf.write(output_filepath, audio_data, self.sample_rate)
+            return output_filepath
+
     def render_binaural_session(
         self,
         start_beat,
@@ -198,7 +227,7 @@ class SoundscapeEngine:
         harmonic_richness=0.0,
         tone_volume=0.10,
         noise_level=0.65,
-        output_filepath="output/session.wav",
+        output_filepath="output/session.mp3",
     ):
         audio_data = self.generate_binaural_stage(
             start_beat=start_beat,
@@ -211,10 +240,9 @@ class SoundscapeEngine:
             tone_volume=tone_volume,
             noise_level=noise_level,
         )
-        sf.write(output_filepath, audio_data, self.sample_rate)
-        return output_filepath
+        return self._save_audio_file(output_filepath, audio_data)
 
-    def render_sequence_session(self, stages, output_filepath="output/sequence_session.wav", crossfade_sec=0.5):
+    def render_sequence_session(self, stages, output_filepath="output/sequence_session.mp3", crossfade_sec=0.5):
         if not stages:
             raise ValueError("No stages provided for sequence generation.")
 
@@ -259,5 +287,4 @@ class SoundscapeEngine:
         if max_val > 1.0:
             final_audio /= max_val
 
-        sf.write(output_filepath, final_audio, self.sample_rate)
-        return output_filepath
+        return self._save_audio_file(output_filepath, final_audio)

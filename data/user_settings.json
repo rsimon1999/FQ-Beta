@@ -1,11 +1,11 @@
 {
-    "tone_volume": 0.1,
+    "tone_volume": 0.05,
     "noise_level": 0.8,
-    "default_atmosphere": "Ocean Waves",
+    "default_atmosphere": "Light Thunderstorm",
     "default_duration_min": "10",
     "isochronic_mode": false,
     "harmonic_richness": 0.0,
-    "start_beat": 10.0,
-    "target_beat": 10.0,
+    "start_beat": 16.0,
+    "target_beat": 8.5,
     "carrier_freq": 200.0
 }

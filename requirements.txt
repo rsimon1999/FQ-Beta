@@ -3,3 +3,4 @@ numpy>=1.21.0
 scipy>=1.9.0
 soundfile>=0.12.1
 sounddevice>=0.4.6
+pydub>=0.25.1

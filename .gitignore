@@ -15,7 +15,22 @@ ENV/
 .idea/
 .vscode/
 .DS_Store
+.dotnet/
+.output/
+.dist/
 
 # Backups & Archives
 *.tar.gz
 *.zip
+
+# Build artifacts, installers & large binaries
+build/
+dist/
+*.dmg
+*.pkg
+*.spec
+*.pyz
+*.dylib
+*.so
+*.app
+*.exe

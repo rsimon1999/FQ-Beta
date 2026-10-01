@@ -2,7 +2,7 @@
 
 import os
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 
 from src.audio.engine import SoundscapeEngine
 from src.audio.player import AudioPlayer
@@ -169,17 +169,39 @@ class MainApp(ctk.CTk):
                 messagebox.showerror("Playback Error", str(e))
 
     def run_generation(self, params):
-        self.status_var.set("⏳ Generating sound file... Please wait.")
-        self.update_idletasks()
-        os.makedirs("output", exist_ok=True)
         mins = int(params.get("duration_sec", 600) // 60)
-        
         preset_tag = params.get("preset_name")
+
+        # Set default output filename base
         if preset_tag:
             clean_name = "".join(c if c.isalnum() else "_" for c in preset_tag).strip("_")
-            filename = f"output/{clean_name}_{mins}min.wav"
+            default_filename = f"{clean_name}_{mins}min.mp3"
         else:
-            filename = f"output/Session_{params.get('target_beat', 10)}Hz_{mins}min.wav"
+            default_filename = f"Session_{params.get('target_beat', 10)}Hz_{mins}min.mp3"
+
+        os.makedirs("output", exist_ok=True)
+
+        # Native OS Save File Dialog with format selection
+        filename = filedialog.asksaveasfilename(
+            initialdir="output",
+            initialfile=default_filename,
+            defaultextension=".mp3",
+            filetypes=[
+                ("MP3 Audio (*.mp3)", "*.mp3"),
+                ("Waveform Audio (*.wav)", "*.wav"),
+                ("FLAC Audio (*.flac)", "*.flac"),
+                ("Ogg Vorbis Audio (*.ogg)", "*.ogg"),
+                ("All Files (*.*)", "*.*")
+            ],
+            title="Save Rendered Audio Session"
+        )
+
+        if not filename:
+            self.status_var.set("Generation canceled.")
+            return
+
+        self.status_var.set("⏳ Generating sound file... Please wait.")
+        self.update_idletasks()
 
         try:
             stages = params.get("stages")
