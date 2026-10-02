@@ -42,7 +42,7 @@ TOUR_STEPS = [
         "title": "👋 Welcome!",
         "body": (
             "Quick tour: 10 steps to walk you through Easy Mode.\n"
-            "You can still use the app while this is open.\n"
+            "We encourage you to follow along in the main UI while this is open.\n"
             "Click Next or Skip Tour anytime."
         ),
         "anchor_attr": None,
@@ -70,7 +70,8 @@ TOUR_STEPS = [
         "body": (
             "Layer a real-world soundscape (ocean, rain, thunder…)\n"
             "behind the binaural tone, or leave it as None for a\n"
-            "clean tone-only session."
+            "clean tone-only session.\n"
+            "Try Calm and Light Thunder.  It's my personal favorite!"
         ),
         "anchor_attr": "noise_option",
     },
@@ -124,7 +125,8 @@ TOUR_STEPS = [
         "body": (
             "Enabled after a successful generation. Plays the most\n"
             "recently created file directly inside the app.\n"
-            "That's it — enjoy your sessions! 🎧"
+            "That's it — enjoy your sessions! 🎧\n"
+            "Make sure to use stereo headphones!"
         ),
         "anchor_attr": None,
     },
