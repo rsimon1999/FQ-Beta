@@ -7,5 +7,6 @@
     "harmonic_richness": 0.0,
     "start_beat": 16.0,
     "target_beat": 8.5,
-    "carrier_freq": 200.0
+    "carrier_freq": 200.0,
+    "easy_mode_tour_completed": true
 }

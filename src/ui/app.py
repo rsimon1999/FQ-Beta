@@ -7,6 +7,7 @@ from tkinter import messagebox, filedialog
 from src.audio.engine import SoundscapeEngine
 from src.audio.player import AudioPlayer
 from src.ui.frames import EasyControlFrame, AdvancedControlFrame
+from src.ui.product_tour import ProductTour
 from src.utils.config import load_user_settings, save_user_settings
 
 ctk.set_appearance_mode("Dark")
@@ -24,9 +25,13 @@ class MainApp(ctk.CTk):
         self.player = AudioPlayer(sample_rate=self.engine.sample_rate)
         self.user_settings = load_user_settings()
         self.last_generated_file = None
+        self._tour = None
 
         self._setup_ui()
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
+
+        # Trigger product tour on first launch (after UI is fully rendered)
+        self.after(600, self._maybe_start_tour)
 
     def _setup_ui(self):
         # Header
@@ -264,8 +269,23 @@ class MainApp(ctk.CTk):
 
     def _on_window_close(self):
         """Clean shutdown handler stopping any active audio stream."""
+        if self._tour:
+            self._tour.close()
         self.player.stop()
         self.destroy()
+
+    def _maybe_start_tour(self):
+        """Start the product tour automatically if it has never been completed."""
+        if not self.user_settings.get("easy_mode_tour_completed", False):
+            self.start_product_tour()
+
+    def start_product_tour(self):
+        """Programmatically launch (or re-launch) the Easy Mode product tour."""
+        # Ensure Easy Mode tab is active so anchor widgets are visible
+        self.tabview.set("Easy Mode")
+        self.update_idletasks()
+        self._tour = ProductTour(self, self.easy_frame)
+        self._tour.start()
 
 
 MainApplication = MainApp

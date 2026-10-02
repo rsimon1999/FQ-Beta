@@ -34,6 +34,7 @@ DEFAULT_USER_SETTINGS: Dict[str, Any] = {
     "start_beat": 10.0,
     "target_beat": 10.0,
     "carrier_freq": 200.0,
+    "easy_mode_tour_completed": False,  # product tour shown on first launch
 }
 
 
